@@ -239,5 +239,29 @@ pub fn task_user_prompt(task: TaskType) -> Option<&'static str> {
              \n\
              这是内部办案分析、非对外文书也非最终法律意见,定罪量刑与诉讼策略请律师把关。方法论借鉴游初 gutachten-criminal-case(Apache 2.0)。",
         ),
+        // ── 工作区专属任务 ──────────────────────────────────────────────
+        TaskType::WorkspaceFreeChat => None,
+        TaskType::WorkspaceDraftLetter => Some(
+            "请起草一份正式法律文书。\n\
+             \n\
+             动笔前先用 ask_user 问 1-2 轮,把情况问清楚(主体身份、诉求、关键事实、证据)。\n\
+             每轮 ask_user 必须给「直接写」出口。\n\
+             问过 1-2 轮、信息差不多够用就直接 workspace_save_draft 落盘。\n\
+             写时缺的次要细节留 [占位] 待用户补。",
+        ),
+        TaskType::WorkspaceAnalyzeDoc => Some(
+            "请分析工作区中的材料。\n\
+             \n\
+             先用 workspace_read_doc 读取材料原文,然后基于材料内容进行分析。\n\
+             分析结论必须有引用标记,每条具体陈述必须有 [N] 标记。\n\
+             材料信息不完整时明确说「材料中未涉及」,不要编造。",
+        ),
+        TaskType::WorkspaceReviewDraft => Some(
+            "请审阅并修改工作区中的文稿。\n\
+             \n\
+             先用 workspace_read_doc 读取原文,然后提出修改建议。\n\
+             修改建议必须用差异对比展示,用户确认后才应用。\n\
+             不要整篇重写,用 workspace_edit_draft 做局部 find/replace。",
+        ),
     }
 }

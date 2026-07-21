@@ -34,9 +34,9 @@ pub mod tabular_digest;
 pub mod team;
 pub mod telemetry;
 pub mod ticktick;
-pub mod update;
 pub mod verify;
 pub mod weather;
+pub mod workspace;
 pub mod yuandian;
 
 use std::path::{Path, PathBuf};
@@ -1113,15 +1113,6 @@ async fn verify_openai_compat_key(
     model: String,
 ) -> verify::VerifyResult {
     verify::verify_openai_compat_key(&api_key, &endpoint, &model).await
-}
-
-/// 2026-05-25 V0.1.8 · 检测版本更新。
-///
-/// 前端启动时调一次(静默,失败不报错),设置页「检查更新」按钮也调。
-/// 数据源:lawtools.top 的 version.json。返回 UpdateInfo 给前端判断是否弹提示。
-#[tauri::command]
-async fn check_for_update() -> update::UpdateInfo {
-    update::check_for_update().await
 }
 
 /// 2026-05-25 V0.1.8 · 拿当前 App 版本(等同于 Tauri 的 getVersion,但走 Cargo.toml)。
@@ -6737,7 +6728,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // 启动时同步初始化数据库连接池 + 跑 migrations
@@ -6960,7 +6950,6 @@ pub fn run() {
             verify_minimax_key,
             verify_openai_compat_key,
             verify_yuandian_key,
-            check_for_update,
             app_version,
             seed_demo_case_if_empty,
             yuandian_full_report,
@@ -7064,6 +7053,32 @@ pub fn run() {
             private::diligence_deep_audit,
             // 滴答清单(TickTick)双向同步(公开功能)
             ticktick::ticktick_call,
+            // AI 事务工作区
+            workspace::commands::workspace_create,
+            workspace::commands::workspace_list,
+            workspace::commands::workspace_get,
+            workspace::commands::workspace_rename,
+            workspace::commands::workspace_archive,
+            workspace::commands::workspace_delete,
+            workspace::commands::workspace_add_documents,
+            workspace::commands::workspace_list_documents,
+            workspace::commands::workspace_remove_document,
+            workspace::commands::workspace_extract_document,
+            workspace::commands::workspace_create_draft,
+            workspace::commands::workspace_list_drafts,
+            workspace::commands::workspace_get_draft,
+            workspace::commands::workspace_update_draft,
+            workspace::commands::workspace_delete_draft,
+            workspace::commands::workspace_mark_draft_final,
+            workspace::commands::workspace_export_draft_docx,
+            workspace::commands::workspace_create_conversation,
+            workspace::commands::workspace_list_conversations,
+            workspace::commands::workspace_rename_conversation,
+            workspace::commands::workspace_delete_conversation,
+            workspace::commands::workspace_list_messages,
+            workspace::commands::workspace_clear_messages,
+            workspace::commands::workspace_chat,
+            workspace::commands::cancel_workspace_chat,
         ])
         .on_window_event(|window, event| {
             match event {

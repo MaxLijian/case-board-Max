@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getVersion } from "@tauri-apps/api/app";
 
 import { MarkdownModal } from "@/components/MarkdownModal";
 import { SourceDocumentViewerDrawer } from "@/components/SourceDocumentViewerDrawer";
@@ -17,10 +16,7 @@ import { HomeDropZone } from "@/components/HomeDropZone";
 import { isCriminalCase, splitCasesByDomain } from "@/lib/caseDomain";
 import { RunningTaskOverlay } from "@/components/RunningTaskOverlay";
 import { RunningTaskProvider } from "@/contexts/RunningTaskContext";
-import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
-import { UpdateSuccessDialog } from "@/components/UpdateSuccessDialog";
-import { consumeJustUpdated, type PendingUpdate } from "@/lib/updater";
-import { VersionChip } from "@/components/VersionChip";
+
 import { toast, dismissToast, ToastViewport } from "@/components/ui/toast";
 import { TransactionModule } from "@/modules/transaction";
 import { ToolsModule } from "@/modules/tools";
@@ -36,7 +32,6 @@ import { confirmDialog } from "@/lib/dialog";
 import { useFeatureFlag } from "@/lib/featureFlags";
 import { primaryOcrIssues } from "@/lib/ocrSettings";
 import {
-  checkForUpdate,
   deleteCase,
   getCaseWithDocs,
   getSettings,
@@ -59,7 +54,6 @@ import {
   type Document,
   type ImportPlan,
   type ProgressEvent,
-  type UpdateInfo,
 } from "@/lib/types";
 import { SplitImportDialog } from "@/components/SplitImportDialog";
 
@@ -157,14 +151,7 @@ function MainApp() {
    * 切别的 tab 时会先 confirm,避免静默丢修改。
    */
   const [settingsDirty, setSettingsDirty] = useState(false);
-  /** 2026-05-25 V0.1.8 · 当前 App 版本(从 Tauri API 拿,等同 Cargo.toml CARGO_PKG_VERSION) */
-  const [appVer, setAppVer] = useState<string>("");
-  /** 2026-05-25 V0.1.8 · 远程版本检测结果(启动时静默 fetch + 用户手动检查会更新) */
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  /** 2026-05-25 V0.1.8 · 是否弹「发现新版本」对话框 */
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-  // 应用内更新重启后弹一次「升级成功」
-  const [justUpdated, setJustUpdated] = useState<PendingUpdate | null>(null);
+
   /** 后台抽取进度(每个 case_id 对应一份独立进度) */
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   // 单文档云端 OCR 轮询子状态(独立 state,不混进 progress 以免每拍重算把进度条闪回 0%)
@@ -231,54 +218,6 @@ function MainApp() {
         setShowDeepSeekChip(hasDeepSeekKey);
       })
       .catch((err) => console.error("加载 settings 失败:", err));
-  }, []);
-
-  // 2026-05-25 V0.1.8 · 启动:拿当前版本 + 静默检测远程版本(失败不报错)
-  useEffect(() => {
-    getVersion()
-      .then(setAppVer)
-      .catch(() => {});
-    // 应用内更新重启后:命中则弹「升级成功 + 更新内容」(只弹一次)
-    consumeJustUpdated()
-      .then((p) => {
-        if (p) setJustUpdated(p);
-      })
-      .catch(() => {});
-    // 2026-06-15 私人自用包防误更新:编译期设 VITE_NO_UPDATE_CHECK=1 → 跳过启动自动检查更新,
-    // 不再弹「发现新版本」。背景:私人自用包带专属功能(「独立」tab),却和公开版共用同一个
-    // lawtools.top/latest.json;公开发版后版本号更高,会把私人版自动更新成公开版、丢掉专属功能
-    // (作者就这么误装过)。公开构建不设此变量 → 照常检查,公开用户正常收到更新。
-    // 手动点右下角版本 chip 仍可主动检查,不受影响。
-    if (import.meta.env.VITE_NO_UPDATE_CHECK !== "1") {
-      checkForUpdate()
-        .then((info) => {
-          setUpdateInfo(info);
-          // 2026-06-11 反馈:每个新版本只自动弹一次,不要每次启动都弹
-          // (开源用户基于旧版二改的,疯狂弹窗会严重打扰)。弹过的版本号记
-          // localStorage;下次远程版本没变就不再弹;发了更新的版本再弹一次。
-          // 用户仍可随时点右下角版本 chip 主动查看更新。
-          const PROMPTED_KEY = "caseboard.update_prompted_version";
-          if (info.has_update && info.latest) {
-            let prompted: string | null = null;
-            try {
-              prompted = localStorage.getItem(PROMPTED_KEY);
-            } catch {
-              /* localStorage 不可用就退回每次弹 */
-            }
-            if (prompted !== info.latest) {
-              setShowUpdateDialog(true);
-              try {
-                localStorage.setItem(PROMPTED_KEY, info.latest);
-              } catch {
-                /* 存不进就下次再弹,无伤 */
-              }
-            }
-          }
-        })
-        .catch(() => {
-          // 静默失败:断网 / CDN 抽风都不打扰
-        });
-    }
   }, []);
 
   // 切 tab 包装:从设置 tab 切走时,如果有未保存改动,先 confirm
@@ -1411,24 +1350,6 @@ function MainApp() {
           exportCase={{ id: reportModalCase.id, name: reportModalCase.name }}
         />
       )}
-      {/* 2026-05-25 V0.1.8 · 左下角版本号 chip + 启动检测发现新版本时弹的更新提示 */}
-      {appVer && (
-        <VersionChip
-          version={appVer}
-          updateInfo={updateInfo}
-          onCheck={(info) => {
-            setUpdateInfo(info);
-            // 手动点 chip 三种反馈:有更新弹 dialog / 失败 toast / 已最新 toast
-            if (info.has_update) {
-              setShowUpdateDialog(true);
-            } else if (info.error) {
-              toast(`检查更新失败:${info.error}`, "error");
-            } else {
-              toast(`已是最新版本 v${info.current}`, "success");
-            }
-          }}
-        />
-      )}
       {splitPlan && (
         <SplitImportDialog
           plan={splitPlan}
@@ -1439,19 +1360,6 @@ function MainApp() {
         />
       )}
 
-      {showUpdateDialog && updateInfo && updateInfo.has_update && (
-        <UpdateAvailableDialog
-          info={updateInfo}
-          onClose={() => setShowUpdateDialog(false)}
-        />
-      )}
-      {justUpdated && (
-        <UpdateSuccessDialog
-          version={justUpdated.version}
-          notes={justUpdated.notes}
-          onClose={() => setJustUpdated(null)}
-        />
-      )}
       {/* 进度条:诉讼 / 刑事 模块详情页 + 当前案件匹配时显示(刑事 tab 同样要有抽取进度,见坑 #20) */}
       {progress &&
         (activeModule === "litigation" || activeModule === "criminal") &&

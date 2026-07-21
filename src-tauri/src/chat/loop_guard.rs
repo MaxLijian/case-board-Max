@@ -74,7 +74,11 @@ impl LoopGuardConfig {
                 DEFAULT_CHAT_LOOP_TIMEOUT_COMPLEX_SECS,
                 DEFAULT_REASONING_TOKENS_COMPLEX,
             ),
-            TaskType::FreeChat => (
+            TaskType::FreeChat
+            | TaskType::WorkspaceFreeChat
+            | TaskType::WorkspaceDraftLetter
+            | TaskType::WorkspaceAnalyzeDoc
+            | TaskType::WorkspaceReviewDraft => (
                 DEFAULT_CHAT_LOOP_MAX_ITERS_DEFAULT,
                 DEFAULT_CHAT_LOOP_TIMEOUT_DEFAULT_SECS,
                 DEFAULT_REASONING_TOKENS_DEFAULT,

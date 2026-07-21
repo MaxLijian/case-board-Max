@@ -62,6 +62,8 @@ pub struct ToolContext<'a> {
     /// 当前 chat 所绑定的 case_id。某些工具(`list_case_docs` / `read_case_doc` /
     /// `find_in_document`)在 `None` 时直接报错。
     pub case_id: Option<&'a str>,
+    /// 工作区 ID。工作区工具用此字段操作工作区数据。
+    pub workspace_id: Option<String>,
     /// V0.2 D2 的 `LocalKb` 实例,`None` = 用户没启用本地 KB,所有 KB-cache 路径跳过。
     pub local_kb: Option<&'a LocalKb>,
     /// Tauri `AppHandle`(cheap Arc clone),给需要触发后台任务并 emit 进度事件的工具用
@@ -221,6 +223,11 @@ impl ToolRegistry {
             Box::new(web::WebSearch),
             Box::new(web::WebFetch),
         ];
+        Self { tools }
+    }
+
+    /// 从工具列表创建注册表。
+    pub fn from_tools(tools: Vec<Box<dyn Tool>>) -> Self {
         Self { tools }
     }
 

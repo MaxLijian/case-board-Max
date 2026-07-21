@@ -44,7 +44,6 @@ import type {
   SaveMemoryNoteInput,
   NewCaseInstance,
   Settings,
-  UpdateInfo,
   VerifyResult,
 } from "./types";
 
@@ -189,12 +188,6 @@ export function verifyOpenAICompatKey(
 /** 在线验证元典 API key。走免费 MCP 余额工具，不消耗法律业务接口积分。 */
 export function verifyYuandianKey(apiKey: string): Promise<VerifyResult> {
   return invoke<VerifyResult>("verify_yuandian_key", { apiKey });
-}
-
-/** 2026-05-25 V0.1.8:检测远程最新版本(lawtools.top 的 version.json)。
- *  失败时 has_update=false + error 字段填上原因,前端可静默忽略。*/
-export function checkForUpdate(): Promise<UpdateInfo> {
-  return invoke<UpdateInfo>("check_for_update");
 }
 
 /** 2026-05-25 V0.1.8:拿当前 App 版本(Cargo.toml CARGO_PKG_VERSION)。 */
@@ -2340,4 +2333,151 @@ export function saveExternalElementDocument(
 /** 工具页(无案件):把外部转换的 base64 docx 写到用户选择的路径(由 Rust 写,绕过前端 fs scope)。 */
 export function saveElementDocxToPath(savePath: string, dataBase64: string): Promise<string> {
   return invoke<string>("save_element_docx_to_path", { savePath, dataBase64 });
+}
+
+/* ------------------------------------------------------------------ */
+/* AI 事务工作区                                                        */
+/* ------------------------------------------------------------------ */
+
+import type {
+  Workspace,
+  WorkspaceInfo,
+  WorkspaceDocument,
+  WorkspaceDraft,
+  WorkspaceConversation,
+  WorkspaceMessage,
+  WorkspaceChatResult,
+} from "./types";
+
+/** 创建工作区。 */
+export function workspaceCreate(name: string, description?: string): Promise<Workspace> {
+  return invoke<Workspace>("workspace_create", { input: { name, description } });
+}
+
+/** 列出所有工作区。 */
+export function workspaceList(): Promise<WorkspaceInfo[]> {
+  return invoke<WorkspaceInfo[]>("workspace_list");
+}
+
+/** 获取单个工作区信息。 */
+export function workspaceGetWorkspace(id: string): Promise<Workspace> {
+  return invoke<Workspace>("workspace_get", { id });
+}
+
+/** 重命名工作区。 */
+export function workspaceRename(id: string, name: string): Promise<void> {
+  return invoke<void>("workspace_rename", { id, name });
+}
+
+/** 归档工作区。 */
+export function workspaceArchive(id: string): Promise<void> {
+  return invoke<void>("workspace_archive", { id });
+}
+
+/** 删除工作区（含磁盘清理）。 */
+export function workspaceDelete(id: string): Promise<void> {
+  return invoke<void>("workspace_delete", { id });
+}
+
+/** 添加材料到工作区。 */
+export function workspaceAddDocuments(workspaceId: string, paths: string[]): Promise<WorkspaceDocument[]> {
+  return invoke<WorkspaceDocument[]>("workspace_add_documents", { workspaceId, paths });
+}
+
+/** 列出工作区材料。 */
+export function workspaceListDocuments(workspaceId: string): Promise<WorkspaceDocument[]> {
+  return invoke<WorkspaceDocument[]>("workspace_list_documents", { workspaceId });
+}
+
+/** 移除工作区材料。 */
+export function workspaceRemoveDocument(id: string): Promise<void> {
+  return invoke<void>("workspace_remove_document", { id });
+}
+
+/** 触发材料 OCR/抽取。 */
+export function workspaceExtractDocument(id: string): Promise<string> {
+  return invoke<string>("workspace_extract_document", { id });
+}
+
+/** 创建文稿。 */
+export function workspaceCreateDraft(workspaceId: string, title: string): Promise<WorkspaceDraft> {
+  return invoke<WorkspaceDraft>("workspace_create_draft", { workspaceId, title });
+}
+
+/** 列出工作区文稿。 */
+export function workspaceListDrafts(workspaceId: string): Promise<WorkspaceDraft[]> {
+  return invoke<WorkspaceDraft[]>("workspace_list_drafts", { workspaceId });
+}
+
+/** 获取文稿详情。 */
+export function workspaceGetDraft(id: string): Promise<WorkspaceDraft> {
+  return invoke<WorkspaceDraft>("workspace_get_draft", { id });
+}
+
+/** 更新文稿内容。 */
+export function workspaceUpdateDraft(id: string, contentMd: string): Promise<void> {
+  return invoke<void>("workspace_update_draft", { id, contentMd });
+}
+
+/** 删除文稿。 */
+export function workspaceDeleteDraft(id: string): Promise<void> {
+  return invoke<void>("workspace_delete_draft", { id });
+}
+
+/** 标记文稿为定稿。 */
+export function workspaceMarkDraftFinal(id: string): Promise<void> {
+  return invoke<void>("workspace_mark_draft_final", { id });
+}
+
+/** 导出文稿为 Word。 */
+export function workspaceExportDraftDocx(draftMd: string, title: string, savePath: string): Promise<string> {
+  return invoke<string>("workspace_export_draft_docx", { draftMd, title, savePath });
+}
+
+/** 创建对话。 */
+export function workspaceCreateConversation(workspaceId: string, title?: string): Promise<WorkspaceConversation> {
+  return invoke<WorkspaceConversation>("workspace_create_conversation", { workspaceId, title });
+}
+
+/** 列出工作区对话。 */
+export function workspaceListConversations(workspaceId: string): Promise<WorkspaceConversation[]> {
+  return invoke<WorkspaceConversation[]>("workspace_list_conversations", { workspaceId });
+}
+
+/** 重命名对话。 */
+export function workspaceRenameConversation(id: string, title: string): Promise<void> {
+  return invoke<void>("workspace_rename_conversation", { id, title });
+}
+
+/** 删除对话。 */
+export function workspaceDeleteConversation(id: string): Promise<void> {
+  return invoke<void>("workspace_delete_conversation", { id });
+}
+
+/** 列出对话消息。 */
+export function workspaceListMessages(conversationId: string): Promise<WorkspaceMessage[]> {
+  return invoke<WorkspaceMessage[]>("workspace_list_messages", { conversationId });
+}
+
+/** 清空对话消息。 */
+export function workspaceClearMessages(conversationId: string): Promise<number> {
+  return invoke<number>("workspace_clear_messages", { conversationId });
+}
+
+/** 发送工作区聊天消息。 */
+export function workspaceChat(
+  conversationId: string,
+  content: string,
+  attachedDocIds?: string[],
+  draftId?: string,
+  taskType?: string,
+): Promise<WorkspaceChatResult> {
+  return invoke<WorkspaceChatResult>("workspace_chat", {
+    input: { conversation_id: conversationId, content, attached_doc_ids: attachedDocIds, draft_id: draftId, task_type: taskType },
+  });
+}
+
+/** 取消工作区聊天。 */
+export function cancelWorkspaceChat(messageId: string): Promise<boolean> {
+  return invoke<boolean>("cancel_workspace_chat", { messageId });
 }

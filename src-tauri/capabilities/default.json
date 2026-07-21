@@ -8,7 +8,6 @@
     "core:window:allow-close",
     "opener:default",
     "dialog:default",
-    "updater:default",
     "process:default",
     "process:allow-restart"
   ]

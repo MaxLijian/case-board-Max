@@ -152,8 +152,12 @@ pub fn route_model(task: TaskType, user_message: &str, settings: &Settings) -> M
         | TaskType::VisualizeCase
         | TaskType::DeepAnalysis
         | TaskType::CriminalDeepAnalysis => ModelChoice::pro(false),
-        // 自由问 → 启发式
-        TaskType::FreeChat => route_free_chat(user_message),
+        // 工作区起草/分析/审阅 → pro(更准)
+        TaskType::WorkspaceDraftLetter
+        | TaskType::WorkspaceAnalyzeDoc
+        | TaskType::WorkspaceReviewDraft => ModelChoice::pro(false),
+        // 自由问(含工作区自由问) → 启发式
+        TaskType::FreeChat | TaskType::WorkspaceFreeChat => route_free_chat(user_message),
     }
 }
 

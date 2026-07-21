@@ -16,7 +16,8 @@ use serde_json::{json, Value};
 
 use super::{opt_str, opt_u32, require_str, Tool, ToolContext, ToolError, ToolResult};
 
-const WEB_USER_AGENT: &str = concat!("CaseBoard/", env!("CARGO_PKG_VERSION"), " legal-assistant");
+const WEB_USER_AGENT: &str =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const WEB_TIMEOUT_SECS: u64 = 15;
 const SEARCH_MAX_RESULTS: usize = 10;
 const FETCH_MAX_CHARS: usize = 60_000;
@@ -75,11 +76,14 @@ impl Tool for WebSearch {
         }
 
         let url = Url::parse_with_params(
-            "https://duckduckgo.com/html/",
+            "https://html.duckduckgo.com/html/",
             &[("q", q.as_str()), ("kl", "cn-zh")],
         )
         .map_err(|e| ToolError::Runtime(format!("构造搜索 URL 失败:{e}")))?;
-        let client = web_client()?;
+        // 搜索只访问 duckduckgo.com 这类已知公开端点,允许跟随重定向:
+        // `duckduckgo.com/html/` 现在会 302 到 `html.duckduckgo.com/html/`,
+        // 而 fetch 用的 web_client 为 SSRF 防护禁用了自动重定向,这里单独用可跟随的客户端。
+        let client = web_client_follow()?;
         let html = client
             .get(url)
             .send()
@@ -184,6 +188,17 @@ fn web_client() -> Result<reqwest::Client, ToolError> {
         .user_agent(WEB_USER_AGENT)
         .timeout(Duration::from_secs(WEB_TIMEOUT_SECS))
         .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| ToolError::Runtime(format!("初始化联网客户端失败:{e}")))
+}
+
+/// 允许跟随重定向的联网客户端,仅供 `web_search` 使用(只访问 duckduckgo.com 等已知公开搜索端点)。
+/// `web_fetch` 故意不用它,以保留 `fetch_public_url` 里逐跳的 SSRF 校验。
+fn web_client_follow() -> Result<reqwest::Client, ToolError> {
+    reqwest::Client::builder()
+        .user_agent(WEB_USER_AGENT)
+        .timeout(Duration::from_secs(WEB_TIMEOUT_SECS))
+        .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .map_err(|e| ToolError::Runtime(format!("初始化联网客户端失败:{e}")))
 }

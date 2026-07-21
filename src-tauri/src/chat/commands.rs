@@ -57,7 +57,7 @@ pub struct ChatCancelRegistry {
 }
 
 impl ChatCancelRegistry {
-    fn register(&self, message_id: String, sender: oneshot::Sender<()>) {
+    pub fn register(&self, message_id: String, sender: oneshot::Sender<()>) {
         let mut guard = self.inner.lock().expect("chat cancel registry poisoned");
         guard.insert(message_id, sender);
     }
@@ -396,6 +396,7 @@ pub async fn case_chat_impl(
         pool,
         settings: &settings,
         case_id: Some(&input.case_id),
+        workspace_id: None,
         local_kb: local_kb.as_ref(),
         // reextract_document 工具需要 AppHandle 触发后台抽取并 emit 进度事件
         app: Some(app.clone()),
@@ -763,7 +764,7 @@ async fn persist_memory_candidates_from_turn(
 /// 从历史里截最近 N 对 user/assistant,总字符不超 budget。
 ///
 /// 返回值是 `(role, content)` 列表,**正序**,可以直接拼到 messages 后。
-fn clip_history_for_replay(rows: &[ChatMessage], char_budget: usize) -> Vec<(String, String)> {
+pub(crate) fn clip_history_for_replay(rows: &[ChatMessage], char_budget: usize) -> Vec<(String, String)> {
     // 从最新往前累计,达到 budget 停;输出时再反转
     let mut acc: Vec<(String, String)> = Vec::new();
     let mut chars_used = 0usize;

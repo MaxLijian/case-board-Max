@@ -922,17 +922,6 @@ export interface VerifyResult {
   message: string;
 }
 
-/** 2026-05-25 V0.1.8 · 版本检测结果(对应 Rust update::UpdateInfo) */
-export interface UpdateInfo {
-  current: string;
-  latest: string | null;
-  has_update: boolean;
-  released_at: string | null;
-  notes: string | null;
-  download_url: string | null;
-  error: string | null;
-}
-
 /** OCR / LLM 后端的选项 */
 export type ProviderChoice = "local" | "cloud";
 
@@ -1172,4 +1161,81 @@ export interface ElementConvertProgress {
   message: string;
   percent: number;
   elapsed_ms: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* AI 事务工作区                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface Workspace {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceInfo {
+  workspace: Workspace;
+  document_count: number;
+  draft_count: number;
+  conversation_count: number;
+}
+
+export interface WorkspaceDocument {
+  id: string;
+  workspace_id: string;
+  source_path: string;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  extraction_status: string;
+  extracted_text_path: string | null;
+  extracted_text_hash: string | null;
+  last_error: string | null;
+  created_at: string;
+}
+
+export interface WorkspaceDraft {
+  id: string;
+  workspace_id: string;
+  title: string;
+  content_md: string;
+  source: string;
+  status: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceConversation {
+  id: string;
+  workspace_id: string;
+  title: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceMessage {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  model: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  latency_ms: number | null;
+  based_on: string | null;
+  artifact_draft_id: string | null;
+  error_short: string | null;
+  citations_json: string | null;
+  created_at: string;
+}
+
+export interface WorkspaceChatResult {
+  message_id: string;
+  content: string;
+  citations_json: string | null;
 }

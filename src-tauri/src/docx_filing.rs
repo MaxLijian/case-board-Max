@@ -56,16 +56,18 @@ impl Role {
     fn east_asia(self) -> &'static str {
         match self {
             Role::Title => "方正小标宋简体",
-            Role::H1 | Role::H2 => "SimHei",
+            Role::H1 => "方正小标宋简体",
+            Role::H2 => "SimHei",
             Role::Body => "仿宋_GB2312",
         }
     }
-    /// 字号(半点)
+    /// 字号(半点) - 标准法律文书格式
     fn sz(self) -> &'static str {
         match self {
-            Role::Title => "32",
-            Role::H1 => "30",
-            Role::H2 | Role::Body => "28",
+            Role::Title => "44",   // 二号 = 22pt = 44半点
+            Role::H1 => "36",     // 小二号 = 18pt = 36半点
+            Role::H2 => "32",     // 三号 = 16pt = 32半点
+            Role::Body => "32",   // 三号 = 16pt = 32半点
         }
     }
     fn centered(self) -> bool {
@@ -160,6 +162,45 @@ fn normalize_cjk_punct(s: &str) -> String {
     out
 }
 
+/// 去掉 emoji 字符,避免 Word 无法渲染(emoji 在 OOXML 中无对应字形,会变成图片或乱码)。
+/// 保留纯文本内容,emoji 语义通过上下文即可理解。
+fn strip_emoji(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        let cp = ch as u32;
+        // 常见 emoji 范围:全部跳过
+        if matches!(cp,
+            // Emoticons
+            0x1F600..=0x1F64F |  // 😄-🙏
+            0x1F680..=0x1F6FF |  // 🚀-🛿
+            0x1F900..=0x1F9FF |  // 🤀-🧿
+            0x1FA00..=0x1FA6F |  // 🤠-🥿
+            0x1FA70..=0x1FAFF |  // 🤰-🧿
+            // Symbols & Pictographs
+            0x1F300..=0x1F5FF |  // 🌀-🗿
+            // Misc Symbols
+            0x2600..=0x26FF |    // ☀-⛿
+            0x2700..=0x27BF |    // ✀-➿ (includes dingbats)
+            // Enclosed characters
+            0x2460..=0x24FF |    // ①-⑿
+            0x2580..=0x259F |    // ▀-▟
+            0x25A0..=0x25FF |    // ■-▼
+            // CJK Symbols (保留)
+            // 0x3000..=0x303F |
+            // Arrows
+            0x2190..=0x21FF |    // ←-↻
+            0x2B05..=0x2B55 |    // ⬅-⭕
+            // Variation Selectors (emoji modifiers)
+            0xFE00..=0xFE0F |    // variation selectors
+            0xE0020..=0xE007F    // tags
+        ) {
+            continue;
+        }
+        out.push(ch);
+    }
+    out
+}
+
 /// 去掉 HTML 注释(artifact MD 头部带 `<!-- chat artifact ... -->`),避免 pulldown 当内联 HTML。
 fn strip_html_comments(md: &str) -> String {
     let mut out = String::with_capacity(md.len());
@@ -212,6 +253,8 @@ impl Walker {
         if !t.is_empty() && t.chars().all(|c| c == '*') {
             return;
         }
+        // 去掉 emoji,避免 Word 无法渲染(emoji 在 OOXML 中无对应字形)
+        let t = strip_emoji(t);
         let bold = self.bold_depth > 0;
         if let Some(cell) = self.cur_cell.as_mut() {
             cell.push(Run {
@@ -568,8 +611,9 @@ pub fn extract_filing_title(md: &str) -> Option<String> {
 
 const DOC_OPEN: &str = r#"<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w10="urn:schemas-microsoft-com:office:word" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml" mc:Ignorable="w14 w15">"#;
 
-/// 页面/页边距/版式网格 —— 与全部 15 份样本字节级一致(A4 / 1英寸边距 / docGrid linePitch=360)。
-const SECTPR: &str = r#"<w:sectPr><w:pgSz w:w="11906" w:h="16838" w:orient="portrait"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/><w:docGrid w:linePitch="360"/></w:sectPr>"#;
+/// 页面/页边距/版式网格 —— 标准法律文书格式(GB/T 9704)
+/// A4 / 上3.7cm 下3.5cm 左2.8cm 右2.6cm / 行距28.8pt
+const SECTPR: &str = r#"<w:sectPr><w:pgSz w:w="11906" w:h="16838" w:orient="portrait"/><w:pgMar w:top="2098" w:right="1474" w:bottom="1985" w:left="1588" w:header="708" w:footer="708" w:gutter="0"/><w:docGrid w:linePitch="576"/></w:sectPr>"#;
 
 const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/></Types>"#;
 

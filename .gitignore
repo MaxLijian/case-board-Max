@@ -66,5 +66,8 @@ docs/
 .clawhub/
 .superpowers/
 
+# WorkBuddy 本地记忆 / 工作区状态(只给本机 agent session 看,不公开)
+.workbuddy/
+
 # macOS 系统 metadata
 *.DS_Store

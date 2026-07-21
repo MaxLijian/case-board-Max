@@ -41,6 +41,15 @@ pub enum TaskType {
     /// 两闸交互确认(候选罪名清单 → 三阶层检视大纲)后逐要件论证,落一份刑事深度分析报告 artifact。
     /// 仅刑事 tab 的 AI 助手用。
     CriminalDeepAnalysis,
+    // ── 工作区专属任务 ──────────────────────────────────────────────
+    /// 工作区自由问答
+    WorkspaceFreeChat,
+    /// 工作区起草函件/文书
+    WorkspaceDraftLetter,
+    /// 工作区材料分析
+    WorkspaceAnalyzeDoc,
+    /// 工作区审阅/修改文稿
+    WorkspaceReviewDraft,
 }
 
 impl TaskType {
@@ -54,6 +63,10 @@ impl TaskType {
             Some("visualize_case") => Self::VisualizeCase,
             Some("deep_analysis") => Self::DeepAnalysis,
             Some("criminal_deep_analysis") => Self::CriminalDeepAnalysis,
+            Some("workspace_free_chat") => Self::WorkspaceFreeChat,
+            Some("workspace_draft_letter") => Self::WorkspaceDraftLetter,
+            Some("workspace_analyze_doc") => Self::WorkspaceAnalyzeDoc,
+            Some("workspace_review_draft") => Self::WorkspaceReviewDraft,
             _ => Self::FreeChat,
         }
     }
@@ -69,6 +82,10 @@ impl TaskType {
             Self::VisualizeCase => Some("visualize_case"),
             Self::DeepAnalysis => Some("deep_analysis"),
             Self::CriminalDeepAnalysis => Some("criminal_deep_analysis"),
+            Self::WorkspaceFreeChat => Some("workspace_free_chat"),
+            Self::WorkspaceDraftLetter => Some("workspace_draft_letter"),
+            Self::WorkspaceAnalyzeDoc => Some("workspace_analyze_doc"),
+            Self::WorkspaceReviewDraft => Some("workspace_review_draft"),
         }
     }
 
@@ -84,6 +101,9 @@ impl TaskType {
                 | Self::VisualizeCase
                 | Self::DeepAnalysis
                 | Self::CriminalDeepAnalysis
+                | Self::WorkspaceDraftLetter
+                | Self::WorkspaceAnalyzeDoc
+                | Self::WorkspaceReviewDraft
         )
     }
 }

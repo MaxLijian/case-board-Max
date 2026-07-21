@@ -193,6 +193,69 @@ impl TaskContract {
                     "最终刑事深度分析报告必须落 artifact,并明确事实存疑和律师需把关事项",
                 ],
             },
+            // ── 工作区专属任务 ──────────────────────────────────────────────
+            TaskType::WorkspaceFreeChat => Self {
+                task,
+                name: "工作区自由问答",
+                required_tools: &[],
+                citation_policy: CitationPolicy::WhenCitingSources,
+                ask_user_policy: AskUserPolicy::Optional,
+                artifact_policy: ArtifactPolicy::Optional,
+                success_criteria: &[
+                    "涉及材料事实时必须先基于工作区材料;证据不足时明确说不确定",
+                    "涉及法条、案例时必须先用工具核验,不能凭训练记忆编条号或案号",
+                    "信息不足时优先用 ask_user 追问,不要凭空补事实",
+                ],
+            },
+            TaskType::WorkspaceDraftLetter => Self {
+                task,
+                name: "工作区起草文书",
+                required_tools: &[
+                    "workspace_read_doc",
+                    "workspace_save_draft",
+                ],
+                citation_policy: CitationPolicy::RequiredForLegalConclusion,
+                ask_user_policy: AskUserPolicy::RequiredBeforeFinal,
+                artifact_policy: ArtifactPolicy::Required,
+                success_criteria: &[
+                    "动笔前先用 ask_user 问 1-2 轮,把情况问清楚",
+                    "每轮 ask_user 必须给「直接写」出口",
+                    "文书必须使用 workspace_save_draft 落盘,聊天只给摘要",
+                    "改已生成的文稿用 workspace_edit_draft 做局部 find/replace",
+                    "次要细节留 [占位] 待用户补",
+                ],
+            },
+            TaskType::WorkspaceAnalyzeDoc => Self {
+                task,
+                name: "工作区材料分析",
+                required_tools: &[
+                    "workspace_read_doc",
+                ],
+                citation_policy: CitationPolicy::RequiredForLegalConclusion,
+                ask_user_policy: AskUserPolicy::Optional,
+                artifact_policy: ArtifactPolicy::Optional,
+                success_criteria: &[
+                    "必须读取材料原文后再分析,不得凭标题或摘要下结论",
+                    "分析结论必须有引用标记,每条具体陈述必须有 [N] 标记",
+                    "材料信息不完整时明确说「材料中未涉及」,不要编造",
+                ],
+            },
+            TaskType::WorkspaceReviewDraft => Self {
+                task,
+                name: "工作区审阅修改",
+                required_tools: &[
+                    "workspace_read_doc",
+                    "workspace_edit_draft",
+                ],
+                citation_policy: CitationPolicy::RequiredForLegalConclusion,
+                ask_user_policy: AskUserPolicy::Optional,
+                artifact_policy: ArtifactPolicy::Optional,
+                success_criteria: &[
+                    "修改前必须先读取原文",
+                    "修改建议必须用差异对比展示,用户确认后才应用",
+                    "不要整篇重写,用 workspace_edit_draft 做局部 find/replace",
+                ],
+            },
         }
     }
 

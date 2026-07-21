@@ -189,6 +189,58 @@ pub async fn extract_text_only_cheap(
     }
 }
 
+/// 便宜直抽;若遇到扫描件 / 图片 / office(需 OCR 才能读)则自动走 OCR 兜底,
+/// 复用 `ocr` 模块(云端 MinerU / PaddleOCR + 本机 MiniCPM-V vision),与诉讼模块行为一致。
+///
+/// 与 `extract_text_only_cheap` 的区别:后者为省云端 OCR 积分,对扫描件直接返回
+/// `Ok(None)`(调用方选择放弃);本函数不放弃,而是接力 OCR,让扫描件 / 图片也能被读出。
+///
+/// 返回:
+///   - `Ok(text)` —— 直抽或 OCR 成功,返回纯文本
+///   - `Err(_)` —— 真实解析错误 / OCR 也未成功(含用户未配置任何 OCR 后端的引导提示)
+pub async fn extract_text_with_ocr_fallback(
+    path: &Path,
+    filename: &str,
+) -> Result<String, String> {
+    let kind = text_extraction_kind(filename);
+    if matches!(kind, TextKind::Unsupported) {
+        return Err(format!("不支持的文件格式: {}", filename));
+    }
+
+    // 第一档:便宜直抽(ReadDirect / Docx / OfficeTextutil / OfficeCloud / Pdf)。
+    // 直接复用 extract_text,与诉讼 extract_one 的文本抽取分支一致:
+    //   - Ok(text)  → 文本型直抽成功,直接返回(工作区只需原文,不跑 LLM 字段抽取)
+    //   - Err("__NEEDS_OCR__") → 扫描件 / 图片 / office,转第二档 OCR 兜底
+    //   - Err(其他) → 真实解析错误
+    // 注意:不用 extract_text_only_cheap —— 那个把"文本太短"也并成 Ok(None),
+    // 会让空/近空 txt 错误地走 OCR;这里按 __NEEDS_OCR__ 信号精确分流,与诉讼对齐。
+    match extract_text(path, kind) {
+        Ok((text, _)) => Ok(text),
+        Err(e) if e == "__NEEDS_OCR__" => {
+            // 第二档:OCR 兜底。从 Settings 读 OCR 配置(云端/本地分流 + 主备 token),
+            // 与 litigation pipeline.rs / element_convert.rs 的 OcrContext 构造保持一致。
+            let settings = crate::settings::read_settings().unwrap_or_default();
+            let cloud_ocr = settings.effective_ocr_provider() == "cloud";
+            let ocr_ctx = OcrContext {
+                cloud_enabled: cloud_ocr,
+                mineru_token: cloud_ocr.then(|| settings.mineru_api_key.clone()).flatten(),
+                paddle_vl_token: cloud_ocr.then(|| settings.paddle_vl_api_key.clone()).flatten(),
+                cloud_primary: settings.effective_ocr_cloud_primary().to_string(),
+                force_backend: None,
+                poll_tx: None,
+            };
+            match ocr::extract_with_ocr(path, &ocr_ctx).await {
+                ocr::OcrResult::Ok { text, .. } => Ok(text),
+                ocr::OcrResult::Skipped { reason } => Err(format!("OCR 跳过:{}", reason)),
+                ocr::OcrResult::Failed { error, attempted } => {
+                    Err(format!("{}(尝试后端:{})", error, attempted.join(", ")))
+                }
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
 /// 根据文件名后缀决定怎么抽文本。
 fn text_extraction_kind(filename: &str) -> TextKind {
     let f = filename.to_lowercase();
@@ -338,6 +390,31 @@ fn extract_text(path: &Path, kind: TextKind) -> Result<(String, &'static str), S
         }
         TextKind::Image => Err("__NEEDS_OCR__".into()), // 由 extract_one 接力 OCR 后端
         TextKind::Unsupported => Err("不支持的格式".into()),
+    }
+}
+
+/// 给工作区 / 外部模块统一使用的 PDF 文本抽取入口。
+///
+/// 复用主抽取管线的 PDF 链路:`pdf-inspector` 主抽(文本型 PDF 一站式出 Markdown),
+/// 扫描件 / 编码异常 / Mixed 含扫描页 → `__NEEDS_OCR__`(由调用方按需处理);
+/// `pdf-inspector` 自身崩溃时兜底 `pdftotext`(poppler)。
+///
+/// 注意:此函数不抛 panic,所有错误转成 `String`;扫描件类错误以 `__NEEDS_OCR__`
+/// 约定字符串返回,方便调用方区分"需要 OCR"与"真实解析失败"。
+pub fn extract_pdf_text(path: &Path) -> Result<String, String> {
+    match extract_pdf_with_inspector(path) {
+        Ok(t) => Ok(t),
+        Err(e) if e == "__NEEDS_OCR__" => Err("__NEEDS_OCR__".into()),
+        Err(_) => {
+            if pdftotext_available() {
+                match extract_pdf_with_pdftotext(path) {
+                    Ok(t) if pdf_text_usable(&t) => Ok(t),
+                    _ => Err("__NEEDS_OCR__".into()),
+                }
+            } else {
+                Err("__NEEDS_OCR__".into())
+            }
+        }
     }
 }
 

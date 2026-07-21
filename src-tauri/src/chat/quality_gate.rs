@@ -222,6 +222,39 @@ fn missing_tool_requirement_warnings(
             ));
             warnings
         }
+        // ── 工作区专属任务 ──────────────────────────────────────────────
+        TaskType::WorkspaceFreeChat => Vec::new(),
+        TaskType::WorkspaceDraftLetter => {
+            let mut warnings = require_tool(
+                tool_calls,
+                "起草文书前应先读取相关材料。",
+                "workspace_read_doc",
+            );
+            warnings.extend(require_tool(
+                tool_calls,
+                "文书应使用 workspace_save_draft 落盘。",
+                "workspace_save_draft",
+            ));
+            warnings
+        }
+        TaskType::WorkspaceAnalyzeDoc => require_tool(
+            tool_calls,
+            "分析材料前应先读取材料原文。",
+            "workspace_read_doc",
+        ),
+        TaskType::WorkspaceReviewDraft => {
+            let mut warnings = require_tool(
+                tool_calls,
+                "修改文稿前应先读取原文。",
+                "workspace_read_doc",
+            );
+            warnings.extend(require_tool(
+                tool_calls,
+                "修改应使用 workspace_edit_draft 做局部编辑。",
+                "workspace_edit_draft",
+            ));
+            warnings
+        }
     }
 }
 

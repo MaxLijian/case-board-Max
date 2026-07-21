@@ -9,17 +9,20 @@
  */
 
 import { useState } from "react";
-import { ArrowLeft, FileSignature, ShieldCheck } from "lucide-react";
+import { ArrowLeft, FileSignature, FolderOpen, ShieldCheck } from "lucide-react";
 
 import { BetaBadge } from "@/components/BetaBadge";
 import { LegalToolCard } from "@/modules/tools/components/LegalToolCard";
 import { ContractReviewTool } from "./ContractReviewTool";
 import { ContractDraftTool } from "./ContractDraftTool";
+import { WorkspaceList } from "./WorkspaceList";
+import { WorkspaceDetail } from "./WorkspaceDetail";
 
-type TransactionToolId = "contract_review" | "contract_draft";
+type TransactionToolId = "contract_review" | "contract_draft" | "workspace";
 
 export function TransactionModule() {
   const [activeTool, setActiveTool] = useState<TransactionToolId | null>(null);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
 
   // 详情视图:合同审查
   if (activeTool === "contract_review") {
@@ -81,6 +84,41 @@ export function TransactionModule() {
     );
   }
 
+  // 详情视图:AI 事务工作区（工作区列表）
+  if (activeTool === "workspace" && !selectedWorkspaceId) {
+    return (
+      <main className="app-shell flex h-full w-full flex-col">
+        <header className="app-subheader flex shrink-0 items-center gap-3 border-b px-4 py-2.5 sm:px-6">
+          <button
+            type="button"
+            onClick={() => setActiveTool(null)}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" />
+            返回非诉
+          </button>
+          <h2 className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <FolderOpen className="size-4 text-sky-600 dark:text-sky-400" />
+            AI 事务工作区
+          </h2>
+        </header>
+        <div className="flex-1 overflow-auto">
+          <WorkspaceList onSelectWorkspace={(id) => setSelectedWorkspaceId(id)} />
+        </div>
+      </main>
+    );
+  }
+
+  // 详情视图:AI 事务工作区（工作区详情）
+  if (activeTool === "workspace" && selectedWorkspaceId) {
+    return (
+      <WorkspaceDetail
+        workspaceId={selectedWorkspaceId}
+        onBack={() => setSelectedWorkspaceId(null)}
+      />
+    );
+  }
+
   // 卡片网格(默认)
   return (
     <main className="app-shell flex h-full w-full flex-col">
@@ -108,6 +146,13 @@ export function TransactionModule() {
               desc="补全交易要素，生成可导出的合同草案。"
               badge="Beta"
               onClick={() => setActiveTool("contract_draft")}
+            />
+            <LegalToolCard
+              icon={FolderOpen}
+              title="AI 事务工作区"
+              desc="独立工作区，支持文件上传+OCR、多对话、多文稿、AI 起草。"
+              badge="New"
+              onClick={() => setActiveTool("workspace")}
             />
           </div>
         </div>
