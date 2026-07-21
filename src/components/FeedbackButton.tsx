@@ -4,8 +4,8 @@
  * 流程:
  *   1. 按钮悬浮在右下,常驻不打扰
  *   2. 点开 → 弹窗显示「自动收集的诊断信息(可折叠)+ 输入框」
- *   3. 用户填描述 → 点「生成反馈文件」
- *   4. Rust 写文件到桌面或 Documents/CaseBoard/feedback 兜底目录
+ *   3. 用户填描述 → 点「一键生成 feedback」
+ *   4. Rust 写文件到 /Users/max/case-board/feedback/
  *   5. Toast 提示路径 + 「在文件管理器中显示」按钮
  *
  * 隐私铁律:
@@ -19,9 +19,9 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  FileText,
   Loader2,
   MessageCircle,
-  Send,
   X,
 } from "lucide-react";
 
@@ -31,8 +31,7 @@ import {
   collectFeedbackDiagnostic,
   type FeedbackDiagnostic,
   revealInFinder,
-  saveFeedbackMd,
-  uploadFeedbackReport,
+  saveFeedbackToProjectDir,
 } from "@/lib/api";
 import { snapshotConsoleErrors } from "@/lib/console-tap";
 import {
@@ -111,9 +110,6 @@ function FeedbackModal({
   const [description, setDescription] = useState(initialDescription);
   const [showDiag, setShowDiag] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploaded, setUploaded] = useState(false);
-  const [uploadErr, setUploadErr] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
   // 启动时拉诊断(把已累积的 console 错误一起带过去)
@@ -132,30 +128,16 @@ function FeedbackModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, submitting]);
 
-  const handleSaveLocal = async () => {
+  const handleGenerateFeedback = async () => {
     if (!diag) return;
     setSubmitting(true);
     try {
-      const path = await saveFeedbackMd(diag, description);
+      const path = await saveFeedbackToProjectDir(diag, description);
       setSavedPath(path);
     } catch (e) {
       alert(`生成反馈文件失败:${e}`);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!diag) return;
-    setUploading(true);
-    setUploadErr(null);
-    try {
-      await uploadFeedbackReport(diag, description);
-      setUploaded(true);
-    } catch (e) {
-      setUploadErr(String(e));
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -221,52 +203,31 @@ function FeedbackModal({
         </div>
 
         {/* 按钮行 */}
-        {uploaded && (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-            已上传给维护者。维护者会在反馈后台查看和处理。
-          </div>
-        )}
-        {uploadErr && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            上传失败:{uploadErr}。可以先保存到本地后手工发送。
-          </div>
-        )}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-          <div className="flex flex-col gap-1">
-            <span className="text-caption text-muted-foreground">
-              ID:{diag?.client_id_short ?? "—"} · 匿名
-            </span>
-            <button
-              type="button"
-              onClick={handleSaveLocal}
-              disabled={submitting || uploading || !diag}
-              className="inline-flex items-center gap-1 text-left text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting && <Loader2 className="size-3 animate-spin" />}
-              仅生成本地 MD
-            </button>
-          </div>
+          <span className="text-caption text-muted-foreground">
+            ID:{diag?.client_id_short ?? "—"} · 匿名
+          </span>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={onClose}
-              disabled={submitting || uploading}
+              disabled={submitting}
             >
-              {uploaded ? "完成" : "取消"}
+              取消
             </Button>
             <Button
               size="sm"
-              onClick={handleUpload}
-              disabled={uploading || submitting || !diag || uploaded}
+              onClick={handleGenerateFeedback}
+              disabled={submitting || !diag}
               className="bg-foreground text-background hover:bg-foreground/90"
             >
-              {uploading ? (
+              {submitting ? (
                 <Loader2 className="size-3 animate-spin" />
               ) : (
-                <Send className="size-3.5" />
+                <FileText className="size-3.5" />
               )}
-              {uploaded ? "已上传" : "上传给维护者"}
+              一键生成 feedback
             </Button>
           </div>
         </div>
@@ -275,7 +236,7 @@ function FeedbackModal({
   );
 }
 
-/* ============================ 反馈生成后面板(含邮件发送) ============================ */
+/* ============================ 反馈生成后面板 ============================ */
 function SavedFeedbackPanel({
   savedPath,
   onClose,

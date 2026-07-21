@@ -4624,6 +4624,16 @@ async fn save_feedback_md(
     Ok(path.to_string_lossy().to_string())
 }
 
+/// 2026-07-21:「一键生成 feedback」把 MD 写到项目目录 /Users/max/case-board/feedback/。
+#[tauri::command]
+async fn save_feedback_to_project_dir(
+    info: feedback::DiagnosticInfo,
+    description: String,
+) -> Result<String, String> {
+    let path = feedback::save_to_project_feedback_dir(&info, &description)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 /// 用户明示点击后,把同一份脱敏反馈 MD 上传到作者的 Supabase 私有收件箱。
 #[tauri::command]
 async fn upload_feedback_report(
@@ -6942,6 +6952,7 @@ pub fn run() {
             get_deepseek_balance,
             collect_feedback_diagnostic,
             save_feedback_md,
+            save_feedback_to_project_dir,
             upload_feedback_report,
             send_feedback_email,
             verify_mineru_key,

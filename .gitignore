@@ -33,6 +33,8 @@ data/
 *.db
 *.db-journal
 feedback-inbox/
+# 一键生成 feedback 输出的本地 MD 文件
+feedback/
 
 # Superpowers scratch
 .superpowers/

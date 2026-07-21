@@ -1165,6 +1165,14 @@ export function saveFeedbackMd(
   return invoke<string>("save_feedback_md", { info, description });
 }
 
+/** 2026-07-21:「一键生成 feedback」把 MD 写到 /Users/max/case-board/feedback/。 */
+export function saveFeedbackToProjectDir(
+  info: FeedbackDiagnostic,
+  description: string,
+): Promise<string> {
+  return invoke<string>("save_feedback_to_project_dir", { info, description });
+}
+
 /** 用户确认后,把脱敏反馈上传到作者的 Supabase 私有收件箱。 */
 export function uploadFeedbackReport(
   info: FeedbackDiagnostic,

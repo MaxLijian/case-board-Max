@@ -1130,6 +1130,22 @@ pub fn save_to_desktop(info: &DiagnosticInfo, user_description: &str) -> Result<
     Ok(path)
 }
 
+/// 2026-07-21:用户要求「一键生成 feedback」直接落盘到项目源码旁的 feedback/ 目录，
+/// 不再上传到维护者。路径固定为 /Users/max/case-board/feedback/（按用户指定）。
+pub fn save_to_project_feedback_dir(
+    info: &DiagnosticInfo,
+    user_description: &str,
+) -> Result<PathBuf, String> {
+    let md = render_md(info, user_description);
+    let ts = chrono::Local::now().format("%Y-%m-%d_%H%M%S").to_string();
+    let filename = format!("案件看板反馈_{}.md", ts);
+    let dir = PathBuf::from("/Users/max/case-board/feedback");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建反馈目录失败: {}", e))?;
+    let path = dir.join(&filename);
+    std::fs::write(&path, md).map_err(|e| format!("写入反馈文件失败: {}", e))?;
+    Ok(path)
+}
+
 pub async fn upload_to_cloud(info: &DiagnosticInfo, user_description: &str) -> Result<(), String> {
     let (base, key) = match (FEEDBACK_SUPABASE_URL, FEEDBACK_SUPABASE_KEY) {
         (Some(base), Some(key)) if !base.trim().is_empty() && !key.trim().is_empty() => {
